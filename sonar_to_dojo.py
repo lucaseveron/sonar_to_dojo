@@ -6,11 +6,11 @@ from datetime import datetime, timedelta
 # ========================
 # CONFIGURACIÓN
 # ========================
-SONARCLOUD_ORG = "test-112"                   # Tu organización
-SONARCLOUD_TOKEN = "88b45c8ffb29735ae9cb8bc5abbebefbfe514cbb"     # Token SonarCloud
-DOJO_URL = "http://72.44.42.142:8080"         # URL del DefectDojo
-DOJO_API_KEY = "0156cacd85272c7da168639f0ced357c5ce63be7"         # Token API DefectDojo
-PROJECT_NAME = "my-app-devops"                # Proyecto a verificar
+SONARCLOUD_ORG = ""       # Tu organización
+SONARCLOUD_TOKEN = ""     # Token SonarCloud
+DOJO_URL = ""             # URL del DefectDojo
+DOJO_API_KEY = ""         # Token API DefectDojo
+PROJECT_NAME = ""         # Proyecto a verificar
 
 # ========================
 # FUNCIONES AUXILIARES

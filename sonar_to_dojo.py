@@ -6,10 +6,10 @@ from datetime import datetime, timedelta
 # ========================
 # CONFIGURACIÓN
 # ========================
-SONARCLOUD_ORG = ""       # Tu organización en SonarCloud
-SONARCLOUD_TOKEN = ""     # Token de SonarCloud
-DOJO_URL = ""             # URL base del DefectDojo (sin barra final)
-DOJO_API_KEY = ""         # Token API de DefectDojo
+SONARCLOUD_ORG = "test-112"       # Tu organización en SonarCloud
+SONARCLOUD_TOKEN = "986b75ac934b215a6e73ce75ff9b813b6098681e"     # Token de SonarCloud
+DOJO_URL = "http://98.91.200.231:8080"             # URL base del DefectDojo (sin barra final)
+DOJO_API_KEY = "1462bafcc0f69b1a840faa3c4f634b60ca0f64a0"         # Token API de DefectDojo
 
 # ========================
 # FUNCIONES AUXILIARES

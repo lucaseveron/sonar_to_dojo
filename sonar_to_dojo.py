@@ -11,7 +11,7 @@ SONARCLOUD_TOKEN = "986b75ac934b215a6e73ce75ff9b813b6098681e"     # Token de Son
 DOJO_URL = "http://98.91.200.231:8080"             # URL base del DefectDojo (sin barra final)
 DOJO_API_KEY = "1462bafcc0f69b1a840faa3c4f634b60ca0f64a0"         # Token API de DefectDojo
 
-# ========================
+# ======================== 
 # FUNCIONES AUXILIARES
 # ========================
 
@@ -142,6 +142,7 @@ def get_sonar_issues(project_key):
         return []
 
 
+
 def upload_to_dojo(test_id, issues):
     """Carga vulnerabilidades a DefectDojo"""
     url = f"{DOJO_URL}/api/v2/findings/"
@@ -151,20 +152,22 @@ def upload_to_dojo(test_id, issues):
     }
 
     severity_map = {
-        "INFO": "Info",
-        "MINOR": "Low",
-        "MAJOR": "Medium",
-        "CRITICAL": "Critical",
-        "BLOCKER": "High"
+        "INFO": ("Info", "0"),
+        "MINOR": ("Low", "1"),
+        "MAJOR": ("Medium", "2"),
+        "BLOCKER": ("High", "3"),
+        "CRITICAL": ("Critical", "4")
     }
 
     uploaded = 0
     for issue in issues:
-        severity = severity_map.get(issue.get("severity", "MAJOR"), "Medium")
+        sev_tuple = severity_map.get(issue.get("severity", "MAJOR"), ("Medium", "2"))
+        severity, numerical = sev_tuple
 
         payload = {
             "title": issue["message"],
             "severity": severity,
+            "numerical_severity": numerical,
             "description": issue.get("message", "Sin descripción"),
             "test": test_id,
             "found_by": [1],
@@ -179,6 +182,7 @@ def upload_to_dojo(test_id, issues):
             print(f"⚠️ Error al subir vulnerabilidad: {resp.text}")
 
     print(f"✅ {uploaded} vulnerabilidades subidas a Dojo.")
+
 
 
 # ========================

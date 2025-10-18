@@ -6,26 +6,37 @@ from datetime import datetime, timedelta
 # ========================
 # CONFIGURACIÓN
 # ========================
-SONARCLOUD_ORG = ""       # Tu organización
-SONARCLOUD_TOKEN = ""     # Token SonarCloud
-DOJO_URL = ""             # URL del DefectDojo
-DOJO_API_KEY = ""         # Token API DefectDojo
-PROJECT_NAME = ""         # Proyecto a verificar
+SONARCLOUD_ORG = ""       # Tu organización en SonarCloud
+SONARCLOUD_TOKEN = ""     # Token de SonarCloud
+DOJO_URL = ""             # URL base del DefectDojo (sin barra final)
+DOJO_API_KEY = ""         # Token API de DefectDojo
 
 # ========================
 # FUNCIONES AUXILIARES
 # ========================
 
-def get_sonar_project(name):
-    """Verifica si existe un proyecto en SonarCloud"""
-    url = f"https://sonarcloud.io/api/projects/search?organization={SONARCLOUD_ORG}&q={name}"
-    resp = requests.get(url, auth=(SONARCLOUD_TOKEN, ""))
-    if resp.status_code == 200:
-        data = resp.json().get("components", [])
-        return data[0] if data else None
-    else:
-        print("❌ Error al conectar con SonarCloud:", resp.text)
-        return None
+def get_all_sonar_projects():
+    """Obtiene todos los proyectos de la organización en SonarCloud"""
+    projects = []
+    page = 1
+
+    while True:
+        url = f"https://sonarcloud.io/api/projects/search?organization={SONARCLOUD_ORG}&p={page}"
+        resp = requests.get(url, auth=(SONARCLOUD_TOKEN, ""))
+        if resp.status_code != 200:
+            print("❌ Error al conectar con SonarCloud:", resp.text)
+            break
+
+        data = resp.json()
+        components = data.get("components", [])
+        projects.extend(components)
+
+        if len(components) < 100:  # Última página
+            break
+        page += 1
+
+    print(f"📊 Total de proyectos encontrados en SonarCloud: {len(projects)}")
+    return projects
 
 
 def get_dojo_product(name):
@@ -51,10 +62,9 @@ def create_dojo_product(name):
     payload = {
         "name": name,
         "description": f"Proyecto importado automáticamente desde SonarCloud ({name})",
-        "prod_type": 1  # ID del tipo de producto (ajustar si tu Dojo usa otros)
+        "prod_type": 1
     }
     resp = requests.post(url, headers=headers, data=json.dumps(payload))
-    
     if resp.status_code in [200, 201]:
         data = resp.json()
         print(f"✅ Producto creado: {name} (ID: {data['id']})")
@@ -65,20 +75,18 @@ def create_dojo_product(name):
 
 
 def create_dojo_engagement(product_id, name):
-    """Crea un engagement en Dojo con fechas obligatorias"""
+    """Crea un engagement en DefectDojo"""
     url = f"{DOJO_URL}/api/v2/engagements/"
     headers = {
         "Authorization": f"Token {DOJO_API_KEY}",
         "Content-Type": "application/json"
     }
-
     today = datetime.now().date()
     next_week = today + timedelta(days=7)
-    fecha = datetime.now().time()
-    formateo_fecha = fecha.strftime("%H%M%S")
+    hora = datetime.now().strftime("%H%M%S")
 
     payload = {
-        "name": f"Import Sonarcloud - {formateo_fecha} ",
+        "name": f"Import SonarCloud - {hora}",
         "product": product_id,
         "status": "In Progress",
         "target_start": str(today),
@@ -108,7 +116,7 @@ def create_dojo_test(engagement_id, name):
     payload = {
         "title": f"Análisis SonarCloud - {name}",
         "engagement": engagement_id,
-        "test_type": 1,  # ID del tipo de test (1 suele ser 'Manual' o 'Generic')
+        "test_type": 1,
         "target_start": str(datetime.now().date()),
         "target_end": str(datetime.now().date())
     }
@@ -116,7 +124,7 @@ def create_dojo_test(engagement_id, name):
     resp = requests.post(url, headers=headers, data=json.dumps(payload))
     if resp.status_code in [200, 201]:
         data = resp.json()
-        print(f"✅ Test creado para engagement {engagement_id} (ID: {data['id']})")
+        print(f"✅ Test creado (ID: {data['id']})")
         return data
     else:
         print(f"❌ Error al crear test ({resp.status_code}): {resp.text}")
@@ -135,14 +143,13 @@ def get_sonar_issues(project_key):
 
 
 def upload_to_dojo(test_id, issues):
-    """Carga las vulnerabilidades a DefectDojo"""
+    """Carga vulnerabilidades a DefectDojo"""
     url = f"{DOJO_URL}/api/v2/findings/"
     headers = {
         "Authorization": f"Token {DOJO_API_KEY}",
         "Content-Type": "application/json"
     }
 
-    # Mapeo entre severidad textual y numérica según DefectDojo
     severity_map = {
         "INFO": "Info",
         "MINOR": "Low",
@@ -151,84 +158,67 @@ def upload_to_dojo(test_id, issues):
         "BLOCKER": "High"
     }
 
-    numerical_map = {
-        "Info": "0",
-        "Low": "1",
-        "Medium": "2",
-        "High": "3",
-        "Critical": "4"
-    }
-
-    count = 0
+    uploaded = 0
     for issue in issues:
         severity = severity_map.get(issue.get("severity", "MAJOR"), "Medium")
-        numerical = numerical_map[severity]
 
         payload = {
             "title": issue["message"],
             "severity": severity,
-            "numerical_severity": numerical,
             "description": issue.get("message", "Sin descripción"),
             "test": test_id,
-            "found_by": [1],  # ID del tipo de test (1 suele ser 'Manual' o 'Generic')
+            "found_by": [1],
             "active": True,
             "verified": False
         }
 
         resp = requests.post(url, headers=headers, data=json.dumps(payload))
         if resp.status_code in [200, 201]:
-            count += 1
+            uploaded += 1
         else:
             print(f"⚠️ Error al subir vulnerabilidad: {resp.text}")
 
-    print(f"✅ {count} vulnerabilidades subidas a Dojo.")
-
+    print(f"✅ {uploaded} vulnerabilidades subidas a Dojo.")
 
 
 # ========================
 # PROCESO PRINCIPAL
 # ========================
 
-print(f"🔍 Verificando proyecto {PROJECT_NAME} en SonarCloud...")
-sonar_project = get_sonar_project(PROJECT_NAME)
+print("🚀 Iniciando sincronización SonarCloud → DefectDojo...\n")
+projects = get_all_sonar_projects()
 
-if not sonar_project:
-    print("❌ No existe el proyecto en SonarCloud.")
+if not projects:
+    print("❌ No se encontraron proyectos en SonarCloud.")
     sys.exit(1)
 
-print(f"✅ Proyecto SonarCloud encontrado: {sonar_project['name']}")
+for project in projects:
+    name = project["name"]
+    key = project["key"]
 
-print(f"🔍 Verificando producto en DefectDojo...")
-dojo_product = get_dojo_product(PROJECT_NAME)
+    print(f"\n🔍 Procesando proyecto: {name}")
 
-if not dojo_product:
-    dojo_product = create_dojo_product(PROJECT_NAME)
+    dojo_product = get_dojo_product(name)
     if not dojo_product:
-        print("❌ No se pudo crear ni obtener el producto en Dojo.")
-        sys.exit(1)
+        dojo_product = create_dojo_product(name)
+        if not dojo_product:
+            continue
 
-product_id = dojo_product["id"]
+    product_id = dojo_product["id"]
 
-print("📦 Creando engagement...")
-engagement = create_dojo_engagement(product_id, PROJECT_NAME)
-if not engagement:
-    print("❌ No se pudo crear el engagement en Dojo.")
-    sys.exit(1)
+    engagement = create_dojo_engagement(product_id, name)
+    if not engagement:
+        continue
 
-engagement_id = engagement["id"]
+    test = create_dojo_test(engagement["id"], name)
+    if not test:
+        continue
 
-print("🧪 Creando test en el engagement...")
-dojo_test = create_dojo_test(engagement_id, PROJECT_NAME)
-if not dojo_test:
-    print("❌ No se pudo crear el test en Dojo.")
-    sys.exit(1)
+    issues = get_sonar_issues(key)
+    if not issues:
+        print("ℹ️ No hay vulnerabilidades para este proyecto.")
+        continue
 
-test_id = dojo_test["id"]
+    upload_to_dojo(test["id"], issues)
 
-print("📤 Extrayendo vulnerabilidades de SonarCloud...")
-issues = get_sonar_issues(sonar_project["key"])
-
-print("📥 Subiendo vulnerabilidades a DefectDojo...")
-upload_to_dojo(test_id, issues)
-
-print("✅ Proceso completado correctamente.")
+print("\n✅ Proceso finalizado para todos los proyectos.")

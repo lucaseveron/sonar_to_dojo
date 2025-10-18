@@ -74,9 +74,10 @@ def create_dojo_engagement(product_id, name):
 
     today = datetime.now().date()
     next_week = today + timedelta(days=7)
+    fecha = datetime.now().time()
 
     payload = {
-        "name": f"Importación automática - {name}",
+        "name": f"Import Sonarcloud - {fecha} ",
         "product": product_id,
         "status": "In Progress",
         "target_start": str(today),
